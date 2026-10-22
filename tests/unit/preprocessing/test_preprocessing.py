@@ -362,6 +362,16 @@ def test_jira_to_markdown_list_markers_are_not_emphasis(
             "[https://example.net/some_underscore_path] more text",
             "https://example.net/some_underscore_path more text",
         ),
+        (
+            "[https://example.net/a_b/|https://example.net/c_d/]",
+            "[https://example.net/a_b/](https://example.net/c_d/)",
+        ),
+        (
+            "[https://example.net/a_b/|https://example.net/a_b/] "
+            "[https://example.net/c_d/|https://example.net/c_d/] and _italic_",
+            "[https://example.net/a_b/](https://example.net/a_b/) "
+            "[https://example.net/c_d/](https://example.net/c_d/) and *italic*",
+        ),
     ],
 )
 def test_jira_to_markdown_preserves_link_targets(
@@ -372,14 +382,38 @@ def test_jira_to_markdown_preserves_link_targets(
     assert preprocessor_with_jira.clean_jira_text(wiki) == expected
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.net/a_b/",
+        "https://example.net/a_b_c/?q=one+two+three#d_e",
+        "http://example.net/a_b_c/",
+        "ftp://example.net/a_b_c/",
+        "mailto:first_last_name@example.net",
+    ],
+)
+@pytest.mark.parametrize("link_template", ["[{url}|{url}]", "[{url}]({url})"])
+def test_jira_to_markdown_preserves_url_labels(
+    preprocessor_with_jira: JiraPreprocessor, url: str, link_template: str
+) -> None:
+    """Convert pasted URL labels without hiding the link's pipe separator."""
+    text = link_template.format(url=url)
+    expected = f"[{url}]({url})"
+    assert preprocessor_with_jira.jira_to_markdown(text) == expected
+    assert preprocessor_with_jira.clean_jira_text(text) == expected
+
+
 @pytest.mark.parametrize("suffix", ["", "|smart-link"])
+@pytest.mark.parametrize(
+    "label", ["My URL", "https://example.net/some_underscore_path"]
+)
 def test_clean_jira_text_preserves_smart_link_targets(
-    preprocessor_with_jira: JiraPreprocessor, suffix: str
+    preprocessor_with_jira: JiraPreprocessor, suffix: str, label: str
 ) -> None:
     """Protect both wiki links and Markdown links produced by smart-link cleanup."""
     url = "https://example.net/some_underscore_path"
-    wiki = f"[My URL|{url}{suffix}]"
-    assert preprocessor_with_jira.clean_jira_text(wiki) == f"[My URL]({url})"
+    wiki = f"[{label}|{url}{suffix}]"
+    assert preprocessor_with_jira.clean_jira_text(wiki) == f"[{label}]({url})"
 
 
 def test_jira_to_markdown_citation(preprocessor_with_jira):
